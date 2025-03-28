@@ -21,10 +21,15 @@ import { useState } from 'react';
 import { useAdminStore } from './stores/adminStore';
 
 // Protected Route Component
+// ProtectedRoute Component - Updated with better handling
 function ProtectedRoute({ children }) {
-  const isAuthenticated = useAdminStore(state => state.isAuthenticated);
+  const { isAuthenticated, admin } = useAdminStore(state => ({
+    isAuthenticated: state.isAuthenticated,
+    admin: state.admin
+  }));
   
-  if (!isAuthenticated) {
+  // Check if authenticated and has admin role
+  if (!isAuthenticated || (admin && admin.role !== 'admin')) {
     return <Navigate to="/" replace />;
   }
 
@@ -34,7 +39,11 @@ function ProtectedRoute({ children }) {
 function AnimatedRoutes() {
   const location = useLocation();
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const isAuthenticated = useAdminStore(state => state.isAuthenticated);
+  const { isAuthenticated, admin, logout } = useAdminStore((state) => ({
+    isAuthenticated: state.isAuthenticated,
+    admin: state.admin,
+    logout: state.logout,
+  }));
   const initAuth = useUserStore(state => state.initAuth);
 
   useEffect(() => {
@@ -43,94 +52,189 @@ function AnimatedRoutes() {
     return () => unsubscribe(); // Cleanup on unmount
   }, [initAuth]);
 
+    const handleAdminLogout = () => {
+      logout();
+      // Optionally, redirect to home page after logout
+      if (location.pathname.startsWith("/admin")) {
+        navigate("/");
+      }
+    };
+
   return (
     <>
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
-          <Route path="/" element={
-            <PageTransition>
-              <>
-                <div className="text-center mb-12">
-                  <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-blue-400 to-cyan-400 mb-4 animate-text floating">
-                    Translate Anything, Anywhere
-                  </h1>
-                  <p className="text-lg text-slate-300 max-w-2xl mx-auto animate-fade-in-down">
-                    Break language barriers with our powerful translation tool. Fast, accurate, and easy to use.
-                  </p>
-                </div>
-                <div className="mt-16">
-                  <Translator />
-                </div>
-                <div className="mt-24">
-                  <Stats />
-                </div>
-                <div className="mt-24">
-                  <Features />
-                </div>
-              </>
-            </PageTransition>
-          } />
-          <Route path="/text-to-speech" element={
-            <PageTransition>
-              <TextToSpeech />
-            </PageTransition>
-          } />
-          <Route path="/speech-to-text" element={
-            <PageTransition>
-              <SpeechToText />
-            </PageTransition>
-          } />
-          <Route path="/keyword-abstractor" element={
-            <PageTransition>
-              <KeywordAbstractor />
-            </PageTransition>
-          } />
-          <Route path="/english-quiz" element={
-            <PageTransition>
-              <EnglishQuiz />
-            </PageTransition>
-          } />
+          <Route
+            path="/"
+            element={
+              <PageTransition>
+                <>
+                  <div className="text-center mb-12">
+                    <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-blue-400 to-cyan-400 mb-4 animate-text floating">
+                      Translate Anything, Anywhere
+                    </h1>
+                    <p className="text-lg text-slate-300 max-w-2xl mx-auto animate-fade-in-down">
+                      Break language barriers with our powerful translation
+                      tool. Fast, accurate, and easy to use.
+                    </p>
+                  </div>
+                  <div className="mt-16">
+                    <Translator />
+                  </div>
+                  <div className="mt-24">
+                    <Stats />
+                  </div>
+                  <div className="mt-24">
+                    <Features />
+                  </div>
+                </>
+              </PageTransition>
+            }
+          />
+          <Route
+            path="/text-to-speech"
+            element={
+              <PageTransition>
+                <TextToSpeech />
+              </PageTransition>
+            }
+          />
+          <Route
+            path="/speech-to-text"
+            element={
+              <PageTransition>
+                <SpeechToText />
+              </PageTransition>
+            }
+          />
+          <Route
+            path="/keyword-abstractor"
+            element={
+              <PageTransition>
+                <KeywordAbstractor />
+              </PageTransition>
+            }
+          />
+          <Route
+            path="/english-quiz"
+            element={
+              <PageTransition>
+                <EnglishQuiz />
+              </PageTransition>
+            }
+          />
 
           {/* Admin Routes */}
-          <Route path="/admin/*" element={
-            <ProtectedRoute>
-              <AdminLayout />
-            </ProtectedRoute>
-          }>
+          <Route
+            path="/admin/*"
+            element={
+              <ProtectedRoute>
+                <AdminLayout />
+              </ProtectedRoute>
+            }
+          >
             <Route index element={<AdminDashboard />} />
             <Route path="quizzes" element={<QuizManagement />} />
             <Route path="quizzes/create" element={<CreateQuiz />} />
             <Route path="quizzes/edit/:id" element={<EditQuiz />} />
-            <Route path="users" element={<div className="text-white">User Management</div>} />
-            <Route path="analytics" element={<div className="text-white">Analytics</div>} />
-            <Route path="settings" element={<div className="text-white">Settings</div>} />
+            <Route
+              path="users"
+              element={<div className="text-white">User Management</div>}
+            />
+            <Route
+              path="analytics"
+              element={<div className="text-white">Analytics</div>}
+            />
+            <Route
+              path="settings"
+              element={<div className="text-white">Settings</div>}
+            />
           </Route>
         </Routes>
       </AnimatePresence>
 
-      <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+      />
 
       <footer className="mt-32 text-center text-slate-400 border-t border-slate-800 pt-8">
         <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
           <div>
             <h3 className="font-semibold text-slate-200 mb-2">Tools</h3>
             <ul className="space-y-2">
-              <li><Link to="/text-to-speech" className="text-slate-400 hover:text-sky-400 transition-colors">Text to Speech</Link></li>
-              <li><Link to="/speech-to-text" className="text-slate-400 hover:text-sky-400 transition-colors">Speech to Text</Link></li>
-              <li><Link to="/keyword-abstractor" className="text-slate-400 hover:text-sky-400 transition-colors">Keyword Abstractor</Link></li>
-              <li><Link to="/english-quiz" className="text-slate-400 hover:text-sky-400 transition-colors">English Quiz</Link></li>
-              <li><Link to="/" className="text-slate-400 hover:text-sky-400 transition-colors">Translator</Link></li>
+              <li>
+                <Link
+                  to="/text-to-speech"
+                  className="text-slate-400 hover:text-sky-400 transition-colors"
+                >
+                  Text to Speech
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/speech-to-text"
+                  className="text-slate-400 hover:text-sky-400 transition-colors"
+                >
+                  Speech to Text
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/keyword-abstractor"
+                  className="text-slate-400 hover:text-sky-400 transition-colors"
+                >
+                  Keyword Abstractor
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/english-quiz"
+                  className="text-slate-400 hover:text-sky-400 transition-colors"
+                >
+                  English Quiz
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/"
+                  className="text-slate-400 hover:text-sky-400 transition-colors"
+                >
+                  Translator
+                </Link>
+              </li>
             </ul>
           </div>
           <div>
             <h3 className="font-semibold text-slate-200 mb-2">Resources</h3>
             <ul className="space-y-2">
-              <li><a href="#" className="text-slate-400 hover:text-sky-400 transition-colors">Documentation</a></li>
-              <li><a href="#" className="text-slate-400 hover:text-sky-400 transition-colors">API</a></li>
-              <li><a href="#" className="text-slate-400 hover:text-sky-400 transition-colors">Pricing</a></li>
+              <li>
+                <a
+                  href="#"
+                  className="text-slate-400 hover:text-sky-400 transition-colors"
+                >
+                  Documentation
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  className="text-slate-400 hover:text-sky-400 transition-colors"
+                >
+                  API
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  className="text-slate-400 hover:text-sky-400 transition-colors"
+                >
+                  Pricing
+                </a>
+              </li>
             </ul>
           </div>
-          <div>
+          <div className="admin-section">
             <h3 className="font-semibold text-slate-200 mb-2">Admin</h3>
             <ul className="space-y-2">
               {!isAuthenticated ? (
@@ -145,16 +249,19 @@ function AnimatedRoutes() {
               ) : (
                 <>
                   <li>
-                    <Link to="/admin" className="text-slate-400 hover:text-sky-400 transition-colors">
+                    <Link
+                      to="/admin"
+                      className="text-slate-400 hover:text-sky-400 transition-colors"
+                    >
                       Admin Dashboard
                     </Link>
                   </li>
                   <li>
                     <button
-                      onClick={() => useAdminStore.getState().logout()}
+                      onClick={handleAdminLogout}
                       className="text-slate-400 hover:text-sky-400 transition-colors"
                     >
-                      Logout
+                      Logout ({admin?.name || "Admin"})
                     </button>
                   </li>
                 </>
