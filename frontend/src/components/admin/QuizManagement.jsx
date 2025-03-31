@@ -1,80 +1,176 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { Dialog, Transition } from '@headlessui/react';
-import { Fragment } from 'react';
-import { 
-  PlusIcon, 
-  PencilIcon, 
-  TrashIcon, 
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { Dialog, Transition } from "@headlessui/react";
+import { Fragment } from "react";
+import {
+  PlusIcon,
+  PencilIcon,
+  TrashIcon,
   MagnifyingGlassIcon,
   AcademicCapIcon,
   ClockIcon,
   QuestionMarkCircleIcon,
   ChevronDownIcon,
   CheckCircleIcon,
-  ExclamationTriangleIcon
-} from '@heroicons/react/24/outline';
+  ExclamationTriangleIcon,
+} from "@heroicons/react/24/outline";
+import { useQuiz } from "../../contexts/QuizContext.jsx";
+import toast from "react-hot-toast";
 
-const mockQuizzes = [
-  {
-    id: 1,
-    title: 'English Grammar Basics',
-    category: 'Grammar',
-    questions: 15,
-    duration: '30 mins',
-    difficulty: 'Beginner',
-    status: 'Active',
-    lastUpdated: '2024-02-10',
-  },
-  {
-    id: 2,
-    title: 'Advanced Vocabulary',
-    category: 'Vocabulary',
-    questions: 20,
-    duration: '45 mins',
-    difficulty: 'Advanced',
-    status: 'Draft',
-    lastUpdated: '2024-02-09',
-  },
-  {
-    id: 3,
-    title: 'Common English Idioms',
-    category: 'Idioms',
-    questions: 25,
-    duration: '40 mins',
-    difficulty: 'Intermediate',
-    status: 'Active',
-    lastUpdated: '2024-02-08',
-  },
-];
-
-const categories = ['All', 'Grammar', 'Vocabulary', 'Idioms', 'Pronunciation'];
-const difficulties = ['All', 'Beginner', 'Intermediate', 'Advanced'];
-const statuses = ['All', 'Active', 'Draft', 'Archived'];
+// Default filter options
+const difficulties = ["All", "Beginner", "Intermediate", "Advanced"];
+const statuses = ["All", "Active", "Draft", "Archived"];
 
 export default function QuizManagement() {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedDifficulty, setSelectedDifficulty] = useState('All');
-  const [selectedStatus, setSelectedStatus] = useState('All');
+  const isMounted = useRef(true);
+  const debounceTimer = useRef(null);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedDifficulty, setSelectedDifficulty] = useState("All");
+  const [selectedStatus, setSelectedStatus] = useState("All");
   const [showFilters, setShowFilters] = useState(false);
-  const [quizzes, setQuizzes] = useState(mockQuizzes);
+  const [quizzes, setQuizzes] = useState([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [quizToDelete, setQuizToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [filtersChanged, setFiltersChanged] = useState(false);
 
-  const filteredQuizzes = quizzes.filter(quiz => {
-    const matchesSearch = quiz.title.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || quiz.category === selectedCategory;
-    const matchesDifficulty = selectedDifficulty === 'All' || quiz.difficulty === selectedDifficulty;
-    const matchesStatus = selectedStatus === 'All' || quiz.status === selectedStatus;
-    return matchesSearch && matchesCategory && matchesDifficulty && matchesStatus;
-  });
+  // Extract only what we need from context to prevent rerenders
+  const { fetchQuizzes, deleteQuiz, categories } = useQuiz();
+
+  // Track component mount state for cleanup
+  useEffect(() => {
+    isMounted.current = true;
+    console.log("QuizManagement mounted");
+
+    return () => {
+      isMounted.current = false;
+      console.log("QuizManagement unmounted");
+      // Clear any pending debounce timers on unmount
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, []);
+
+  // Handle search input with debounce
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    setFiltersChanged(true);
+
+    // Clear any existing debounce timer
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+
+    // Set new debounce timer
+    debounceTimer.current = setTimeout(() => {
+      if (isMounted.current) {
+        // Only trigger if component is still mounted
+        loadQuizzes(
+          value,
+          selectedCategory,
+          selectedDifficulty,
+          selectedStatus
+        );
+      }
+    }, 500); // 500ms debounce delay
+  };
+
+  // Handle filter changes
+  const handleFilterChange = (type, value) => {
+    switch (type) {
+      case "category":
+        setSelectedCategory(value);
+        break;
+      case "difficulty":
+        setSelectedDifficulty(value);
+        break;
+      case "status":
+        setSelectedStatus(value);
+        break;
+      default:
+        return;
+    }
+
+    setFiltersChanged(true);
+
+    // Clear any existing debounce timer
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+
+    // Set new debounce timer
+    debounceTimer.current = setTimeout(() => {
+      if (isMounted.current) {
+        // Only trigger if component is still mounted
+        loadQuizzes(
+          searchTerm,
+          type === "category" ? value : selectedCategory,
+          type === "difficulty" ? value : selectedDifficulty,
+          type === "status" ? value : selectedStatus
+        );
+      }
+    }, 300); // 300ms debounce delay for filters
+  };
+
+  // Load quizzes function (not inside useEffect)
+  const loadQuizzes = async (search, category, difficulty, status) => {
+    console.log("Loading quizzes with filters:", {
+      search,
+      category,
+      difficulty,
+      status,
+    });
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const filters = {
+        search,
+        category,
+        difficulty,
+        status,
+      };
+
+      const data = await fetchQuizzes(filters);
+
+      if (isMounted.current) {
+        console.log("Setting quizzes:", data);
+        setQuizzes(data || []);
+        setIsLoading(false);
+        setFiltersChanged(false);
+      }
+    } catch (error) {
+      console.error("Failed to fetch quizzes:", error);
+      if (isMounted.current) {
+        setError("Failed to load quizzes. Please try again.");
+        setIsLoading(false);
+        toast.error("Failed to load quizzes");
+      }
+    }
+  };
+
+  // Initial load on component mount
+  useEffect(() => {
+    console.log("Initial quizzes load");
+    loadQuizzes(
+      searchTerm,
+      selectedCategory,
+      selectedDifficulty,
+      selectedStatus
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCreateQuiz = () => {
-    navigate('/admin/quizzes/create');
+    navigate("/admin/quizzes/create");
   };
 
   const handleEditQuiz = (quizId) => {
@@ -93,20 +189,45 @@ export default function QuizManagement() {
 
   const handleDeleteQuiz = async () => {
     if (!quizToDelete) return;
-    
+
     setIsDeleting(true);
     try {
-      // Here you would typically make an API call to delete the quiz
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      
-      // Update local state
-      setQuizzes(quizzes.filter(quiz => quiz.id !== quizToDelete.id));
-      closeDeleteDialog();
+      const success = await deleteQuiz(quizToDelete.id);
+      if (success && isMounted.current) {
+        // Update local state
+        setQuizzes((prevQuizzes) =>
+          prevQuizzes.filter((quiz) => quiz.id !== quizToDelete.id)
+        );
+        closeDeleteDialog();
+        toast.success("Quiz deleted successfully");
+      }
     } catch (error) {
-      console.error('Failed to delete quiz:', error);
+      console.error("Failed to delete quiz:", error);
+      if (isMounted.current) {
+        toast.error("Failed to delete quiz");
+      }
     } finally {
-      setIsDeleting(false);
+      if (isMounted.current) {
+        setIsDeleting(false);
+      }
     }
+  };
+
+  // Reset all filters
+  const resetFilters = () => {
+    setSearchTerm("");
+    setSelectedCategory("All");
+    setSelectedDifficulty("All");
+    setSelectedStatus("All");
+    setFiltersChanged(true);
+
+    // Clear any existing debounce timer
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+
+    // Load quizzes with reset filters
+    loadQuizzes("", "All", "All", "All");
   };
 
   return (
@@ -151,7 +272,7 @@ export default function QuizManagement() {
               type="text"
               placeholder="Search quizzes..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearchChange}
               className="w-full pl-10 pr-4 py-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200"
             />
           </div>
@@ -160,7 +281,11 @@ export default function QuizManagement() {
             className="px-4 py-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-300 hover:text-white hover:border-sky-500/50 transition-all duration-200 flex items-center space-x-2"
           >
             <span>Filters</span>
-            <ChevronDownIcon className={`w-4 h-4 transform transition-transform duration-200 ${showFilters ? 'rotate-180' : ''}`} />
+            <ChevronDownIcon
+              className={`w-4 h-4 transform transition-transform duration-200 ${
+                showFilters ? "rotate-180" : ""
+              }`}
+            />
           </button>
         </div>
 
@@ -168,44 +293,60 @@ export default function QuizManagement() {
           {showFilters && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
+              animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="grid grid-cols-1 md:grid-cols-3 gap-4 overflow-hidden"
             >
               <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">Category</label>
+                <label className="block text-sm font-medium text-slate-400 mb-2">
+                  Category
+                </label>
                 <select
                   value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  onChange={(e) =>
+                    handleFilterChange("category", e.target.value)
+                  }
                   className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200"
                 >
-                  {categories.map(category => (
-                    <option key={category} value={category}>{category}</option>
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">Difficulty</label>
+                <label className="block text-sm font-medium text-slate-400 mb-2">
+                  Difficulty
+                </label>
                 <select
                   value={selectedDifficulty}
-                  onChange={(e) => setSelectedDifficulty(e.target.value)}
+                  onChange={(e) =>
+                    handleFilterChange("difficulty", e.target.value)
+                  }
                   className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200"
                 >
-                  {difficulties.map(difficulty => (
-                    <option key={difficulty} value={difficulty}>{difficulty}</option>
+                  {difficulties.map((difficulty) => (
+                    <option key={difficulty} value={difficulty}>
+                      {difficulty}
+                    </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">Status</label>
+                <label className="block text-sm font-medium text-slate-400 mb-2">
+                  Status
+                </label>
                 <select
                   value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  onChange={(e) => handleFilterChange("status", e.target.value)}
                   className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200"
                 >
-                  {statuses.map(status => (
-                    <option key={status} value={status}>{status}</option>
+                  {statuses.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -214,72 +355,139 @@ export default function QuizManagement() {
         </AnimatePresence>
       </motion.div>
 
-      {/* Quiz List */}
-      <div className="space-y-4">
-        {filteredQuizzes.map((quiz, index) => (
-          <motion.div
-            key={quiz.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50 hover:border-sky-500/50 transition-all duration-300 group"
-          >
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <h3 className="text-xl font-semibold text-white group-hover:text-sky-400 transition-colors duration-300">
-                    {quiz.title}
-                  </h3>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    quiz.status === 'Active' ? 'bg-green-500/20 text-green-400' :
-                    quiz.status === 'Draft' ? 'bg-yellow-500/20 text-yellow-400' :
-                    'bg-slate-500/20 text-slate-400'
-                  }`}>
-                    {quiz.status}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-6 text-sm text-slate-400">
-                  <div className="flex items-center space-x-2">
-                    <AcademicCapIcon className="w-4 h-4" />
-                    <span>{quiz.category}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <QuestionMarkCircleIcon className="w-4 h-4" />
-                    <span>{quiz.questions} Questions</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <ClockIcon className="w-4 h-4" />
-                    <span>{quiz.duration}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircleIcon className="w-4 h-4" />
-                    <span>{quiz.difficulty}</span>
-                  </div>
-                </div>
-              </div>
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex items-center justify-center min-h-[200px]">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full border-2 border-sky-500 border-t-transparent animate-spin"></div>
+            <div className="absolute inset-0 rounded-full border-2 border-sky-500/20"></div>
+          </div>
+        </div>
+      )}
 
-              <div className="flex items-center space-x-3">
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => handleEditQuiz(quiz.id)}
-                  className="p-2 rounded-lg bg-slate-700/50 hover:bg-sky-500/20 text-slate-300 hover:text-sky-400 transition-all duration-200"
-                >
-                  <PencilIcon className="w-5 h-5" />
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => openDeleteDialog(quiz)}
-                  className="p-2 rounded-lg bg-slate-700/50 hover:bg-red-500/20 text-slate-300 hover:text-red-400 transition-all duration-200"
-                >
-                  <TrashIcon className="w-5 h-5" />
-                </motion.button>
+      {/* Error State */}
+      {error && !isLoading && (
+        <div className="flex flex-col items-center justify-center min-h-[200px] space-y-4">
+          <p className="text-red-400">{error}</p>
+          <button
+            onClick={() =>
+              loadQuizzes(
+                searchTerm,
+                selectedCategory,
+                selectedDifficulty,
+                selectedStatus
+              )
+            }
+            className="px-4 py-2 bg-slate-800/50 hover:bg-slate-700/50 rounded-xl text-white transition-all duration-200"
+          >
+            Try Again
+          </button>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && !error && quizzes.length === 0 && (
+        <div className="flex flex-col items-center justify-center min-h-[200px] space-y-4 bg-slate-800/30 rounded-2xl p-8 border border-slate-700/50">
+          <div className="w-16 h-16 rounded-full bg-slate-700/50 flex items-center justify-center">
+            <QuestionMarkCircleIcon className="w-8 h-8 text-slate-400" />
+          </div>
+          <h3 className="text-xl font-semibold text-white">No Quizzes Found</h3>
+          <p className="text-slate-400 text-center max-w-md">
+            {searchTerm ||
+            selectedCategory !== "All" ||
+            selectedDifficulty !== "All" ||
+            selectedStatus !== "All"
+              ? "No quizzes match your current filters. Try adjusting your search criteria."
+              : "You haven't created any quizzes yet. Click the 'Create Quiz' button to get started."}
+          </p>
+          {(searchTerm ||
+            selectedCategory !== "All" ||
+            selectedDifficulty !== "All" ||
+            selectedStatus !== "All") && (
+            <button
+              onClick={resetFilters}
+              className="px-4 py-2 bg-slate-700 text-white rounded-xl hover:bg-slate-600 transition-colors"
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Quiz List */}
+      {!isLoading && !error && quizzes.length > 0 && (
+        <div className="space-y-4">
+          {quizzes.map((quiz, index) => (
+            <motion.div
+              key={quiz.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50 hover:border-sky-500/50 transition-all duration-300 group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-3">
+                    <h3 className="text-xl font-semibold text-white group-hover:text-sky-400 transition-colors duration-300">
+                      {quiz.title}
+                    </h3>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        quiz.status === "Active"
+                          ? "bg-green-500/20 text-green-400"
+                          : quiz.status === "Draft"
+                          ? "bg-yellow-500/20 text-yellow-400"
+                          : "bg-slate-500/20 text-slate-400"
+                      }`}
+                    >
+                      {quiz.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-6 text-sm text-slate-400">
+                    <div className="flex items-center space-x-2">
+                      <AcademicCapIcon className="w-4 h-4" />
+                      <span>{quiz.category}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <QuestionMarkCircleIcon className="w-4 h-4" />
+                      <span>{quiz.questions} Questions</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <ClockIcon className="w-4 h-4" />
+                      <span>{quiz.duration}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <CheckCircleIcon className="w-4 h-4" />
+                      <span>{quiz.difficulty}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-3">
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => handleEditQuiz(quiz.id)}
+                    className="p-2 rounded-lg bg-slate-700/50 hover:bg-sky-500/20 text-slate-300 hover:text-sky-400 transition-all duration-200"
+                    disabled={isLoading}
+                  >
+                    <PencilIcon className="w-5 h-5" />
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => openDeleteDialog(quiz)}
+                    className="p-2 rounded-lg bg-slate-700/50 hover:bg-red-500/20 text-slate-300 hover:text-red-400 transition-all duration-200"
+                    disabled={isLoading}
+                  >
+                    <TrashIcon className="w-5 h-5" />
+                  </motion.button>
+                </div>
               </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <Transition appear show={deleteDialogOpen} as={Fragment}>
@@ -313,11 +521,15 @@ export default function QuizManagement() {
                       <ExclamationTriangleIcon className="w-6 h-6 text-red-500" />
                     </div>
                     <div>
-                      <Dialog.Title as="h3" className="text-lg font-medium text-white">
+                      <Dialog.Title
+                        as="h3"
+                        className="text-lg font-medium text-white"
+                      >
                         Delete Quiz
                       </Dialog.Title>
                       <p className="mt-2 text-sm text-slate-400">
-                        Are you sure you want to delete "{quizToDelete?.title}"? This action cannot be undone.
+                        Are you sure you want to delete "{quizToDelete?.title}"?
+                        This action cannot be undone.
                       </p>
                     </div>
                   </div>
@@ -339,9 +551,25 @@ export default function QuizManagement() {
                     >
                       {isDeleting ? (
                         <>
-                          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          <svg
+                            className="animate-spin h-4 w-4"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
                           </svg>
                           <span>Deleting...</span>
                         </>

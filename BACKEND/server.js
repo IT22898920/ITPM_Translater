@@ -19,6 +19,9 @@ const userRoutes = require("./routes/auth");
 const synonymsRouter = require("./routes/synonyms.js");
 const antonymsRouter = require("./routes/antonyms.js");
 const newUserRoute = require("./routes/newUserRoute");
+const quizRoutes = require("./routes/quizRoutes");
+const studentQuizRoutes = require("./routes/studentQuizRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
 
 // CORS configuration - IMPORTANT: This must be set up before any routes
 const corsOptions = {
@@ -40,6 +43,9 @@ app.use("/api/auth", userRoutes);
 app.use("/synonyms", synonymsRouter);
 app.use("/antonyms", antonymsRouter);
 app.use("/api/new-user", newUserRoute);
+app.use("/api/quizzes", quizRoutes);
+app.use("/api/student", studentQuizRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 // Error Middleware for handling errors
 app.use(errorHandler);

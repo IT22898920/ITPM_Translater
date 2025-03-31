@@ -1,35 +1,44 @@
-import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
-import { useUserStore } from './stores/userStore';
-import Translator from './components/Translator';
-import Header from './components/Header';
-import Features from './components/Features';
-import Stats from './components/Stats';
-import TextToSpeech from './components/TextToSpeech';
-import SpeechToText from './components/SpeechToText';
-import KeywordAbstractor from './components/KeywordAbstractor';
-import EnglishQuiz from './components/EnglishQuiz';
-import PageTransition from './components/PageTransition';
-import AdminLayout from './components/admin/AdminLayout';
-import AdminDashboard from './components/admin/AdminDashboard';
-import QuizManagement from './components/admin/QuizManagement';
-import CreateQuiz from './components/admin/CreateQuiz';
-import EditQuiz from './components/admin/EditQuiz';
-import LoginModal from './components/admin/LoginModal';
-import { useState } from 'react';
-import { useAdminStore } from './stores/adminStore';
+import { useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Link,
+  useLocation,
+  Navigate,
+  useNavigate,
+} from "react-router-dom";
+import { AnimatePresence } from "framer-motion";
+import { useUserStore } from "./stores/userStore";
+import Translator from "./components/Translator";
+import Header from "./components/Header";
+import Features from "./components/Features";
+import Stats from "./components/Stats";
+import TextToSpeech from "./components/TextToSpeech";
+import SpeechToText from "./components/SpeechToText";
+import KeywordAbstractor from "./components/KeywordAbstractor";
+import EnglishQuiz from "./components/EnglishQuiz";
+import PageTransition from "./components/PageTransition";
+import AdminLayout from "./components/admin/AdminLayout";
+import AdminDashboard from "./components/admin/AdminDashboard";
+import QuizManagement from "./components/admin/QuizManagement";
+import CreateQuiz from "./components/admin/CreateQuiz";
+import EditQuiz from "./components/admin/EditQuiz";
+import LoginModal from "./components/admin/LoginModal";
+import { useState } from "react";
+import { useAdminStore } from "./stores/adminStore";
+import { QuizProvider } from "./contexts/QuizContext.jsx"; // Make sure to import with .jsx extension
+import { Toaster } from "react-hot-toast";
 
 // Protected Route Component
-// ProtectedRoute Component - Updated with better handling
 function ProtectedRoute({ children }) {
-  const { isAuthenticated, admin } = useAdminStore(state => ({
+  const { isAuthenticated, admin } = useAdminStore((state) => ({
     isAuthenticated: state.isAuthenticated,
-    admin: state.admin
+    admin: state.admin,
   }));
-  
+
   // Check if authenticated and has admin role
-  if (!isAuthenticated || (admin && admin.role !== 'admin')) {
+  if (!isAuthenticated || (admin && admin.role !== "admin")) {
     return <Navigate to="/" replace />;
   }
 
@@ -38,13 +47,14 @@ function ProtectedRoute({ children }) {
 
 function AnimatedRoutes() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const { isAuthenticated, admin, logout } = useAdminStore((state) => ({
     isAuthenticated: state.isAuthenticated,
     admin: state.admin,
     logout: state.logout,
   }));
-  const initAuth = useUserStore(state => state.initAuth);
+  const initAuth = useUserStore((state) => state.initAuth);
 
   useEffect(() => {
     // Initialize Firebase auth listener
@@ -52,13 +62,13 @@ function AnimatedRoutes() {
     return () => unsubscribe(); // Cleanup on unmount
   }, [initAuth]);
 
-    const handleAdminLogout = () => {
-      logout();
-      // Optionally, redirect to home page after logout
-      if (location.pathname.startsWith("/admin")) {
-        navigate("/");
-      }
-    };
+  const handleAdminLogout = () => {
+    logout();
+    // Optionally, redirect to home page after logout
+    if (location.pathname.startsWith("/admin")) {
+      navigate("/");
+    }
+  };
 
   return (
     <>
@@ -119,17 +129,21 @@ function AnimatedRoutes() {
             path="/english-quiz"
             element={
               <PageTransition>
-                <EnglishQuiz />
+                <QuizProvider>
+                  <EnglishQuiz />
+                </QuizProvider>
               </PageTransition>
             }
           />
 
-          {/* Admin Routes */}
+          {/* Admin Routes - Wrapped with QuizProvider */}
           <Route
             path="/admin/*"
             element={
               <ProtectedRoute>
-                <AdminLayout />
+                <QuizProvider>
+                  <AdminLayout />
+                </QuizProvider>
               </ProtectedRoute>
             }
           >
@@ -273,6 +287,30 @@ function AnimatedRoutes() {
           © 2025 TranslaterHUB. All rights reserved.
         </p>
       </footer>
+
+      {/* Toast Notifications */}
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: "#1e293b",
+            color: "#f1f5f9",
+            border: "1px solid #334155",
+          },
+          success: {
+            iconTheme: {
+              primary: "#38bdf8",
+              secondary: "#1e293b",
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: "#ef4444",
+              secondary: "#1e293b",
+            },
+          },
+        }}
+      />
     </>
   );
 }
@@ -281,9 +319,9 @@ function App() {
   useEffect(() => {
     // Create animated background elements
     const createBackgroundElement = () => {
-      const element = document.createElement('div');
-      element.className = 'animated-bg-element';
-      
+      const element = document.createElement("div");
+      element.className = "animated-bg-element";
+
       // Randomize properties
       const size = Math.random() * 150 + 100; // Larger size range
       const x = Math.random() * window.innerWidth;
@@ -292,16 +330,17 @@ function App() {
       const delay = Math.random() * 5;
       const rotation = Math.random() * 360;
       const scale = Math.random() * 0.5 + 0.8;
-      
+
       // Random gradient colors
       const colors = [
-        ['rgba(56, 189, 248, 0.1)', 'rgba(129, 140, 248, 0.1)'], // Blue to Purple
-        ['rgba(236, 72, 153, 0.1)', 'rgba(167, 139, 250, 0.1)'], // Pink to Purple
-        ['rgba(34, 211, 238, 0.1)', 'rgba(56, 189, 248, 0.1)'], // Cyan to Blue
-        ['rgba(167, 139, 250, 0.1)', 'rgba(236, 72, 153, 0.1)'], // Purple to Pink
+        ["rgba(56, 189, 248, 0.1)", "rgba(129, 140, 248, 0.1)"], // Blue to Purple
+        ["rgba(236, 72, 153, 0.1)", "rgba(167, 139, 250, 0.1)"], // Pink to Purple
+        ["rgba(34, 211, 238, 0.1)", "rgba(56, 189, 248, 0.1)"], // Cyan to Blue
+        ["rgba(167, 139, 250, 0.1)", "rgba(236, 72, 153, 0.1)"], // Purple to Pink
       ];
-      const [color1, color2] = colors[Math.floor(Math.random() * colors.length)];
-      
+      const [color1, color2] =
+        colors[Math.floor(Math.random() * colors.length)];
+
       element.style.cssText = `
         position: fixed;
         width: ${size}px;
@@ -322,8 +361,8 @@ function App() {
       document.body.appendChild(element);
 
       // Create a companion element for additional visual effect
-      const companionElement = document.createElement('div');
-      companionElement.className = 'animated-bg-element companion';
+      const companionElement = document.createElement("div");
+      companionElement.className = "animated-bg-element companion";
       companionElement.style.cssText = `
         position: fixed;
         width: ${size * 0.8}px;
@@ -368,7 +407,9 @@ function App() {
     return () => {
       clearTimeout(timer);
       // Clean up existing elements
-      document.querySelectorAll('.animated-bg-element').forEach(el => el.remove());
+      document
+        .querySelectorAll(".animated-bg-element")
+        .forEach((el) => el.remove());
     };
   }, []);
 

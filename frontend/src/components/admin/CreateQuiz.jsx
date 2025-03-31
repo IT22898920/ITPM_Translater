@@ -1,383 +1,763 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useForm } from 'react-hook-form';
-import { 
-  PlusIcon, 
-  TrashIcon, 
-  ArrowLeftIcon,
-  DocumentTextIcon,
-  ClockIcon,
-  AcademicCapIcon,
-  QuestionMarkCircleIcon
-} from '@heroicons/react/24/outline';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  PlusIcon,
+  TrashIcon,
+  PencilIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  CheckIcon,
+  XMarkIcon,
+  DocumentCheckIcon,
+  DocumentIcon,
+} from "@heroicons/react/24/outline";
+import { QuizService } from "../../services/quizService";
+import toast from "react-hot-toast";
 
-const categories = ['Grammar', 'Vocabulary', 'Idioms', 'Pronunciation'];
-const difficulties = ['Beginner', 'Intermediate', 'Advanced'];
-
-export default function CreateQuiz({ initialData = null, mode = 'create' }) {
+export default function CreateQuiz({ initialData = null, mode = "create" }) {
   const navigate = useNavigate();
-  const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm({
-    defaultValues: initialData || {
-      title: '',
-      category: '',
-      difficulty: '',
-      duration: ''
-    }
-  });
-  
-  const [questions, setQuestions] = useState([{ text: '', options: ['', '', '', ''], correctOption: 0 }]);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("");
+  const [difficulty, setDifficulty] = useState("Beginner");
+  const [duration, setDuration] = useState("");
+  const [status, setStatus] = useState("Draft");
+  const [questions, setQuestions] = useState([]);
+  const [categories, setCategories] = useState([
+    "Grammar",
+    "Vocabulary",
+    "Idioms",
+    "Pronunciation",
+  ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState(null);
+  const [newQuestion, setNewQuestion] = useState({
+    text: "",
+    options: ["", "", "", ""],
+    correctOption: 0,
+  });
+  const [errors, setErrors] = useState({});
 
+  // Load categories from the server
   useEffect(() => {
-    if (initialData) {
-      // Set form values from initialData
-      setValue('title', initialData.title);
-      setValue('category', initialData.category);
-      setValue('difficulty', initialData.difficulty);
-      setValue('duration', initialData.duration);
-      
-      // Set questions if they exist
-      if (initialData.questions && initialData.questions.length > 0) {
-        setQuestions(initialData.questions);
+    const fetchCategories = async () => {
+      try {
+        const fetchedCategories = await QuizService.getCategories();
+        // Remove 'All' from the categories list as it's only used for filtering
+        const filteredCategories = fetchedCategories.filter(
+          (cat) => cat !== "All"
+        );
+        if (filteredCategories.length > 0) {
+          setCategories(filteredCategories);
+        }
+      } catch (error) {
+        console.error("Failed to fetch categories:", error);
       }
+    };
+
+    fetchCategories();
+  }, []);
+
+  // Initialize form with existing data for edit mode
+  useEffect(() => {
+    if (initialData && mode === "edit") {
+      setTitle(initialData.title || "");
+      setCategory(initialData.category || "");
+      setDifficulty(initialData.difficulty || "Beginner");
+      setDuration(initialData.duration?.toString() || "");
+      setStatus(initialData.status || "Draft");
+      setQuestions(initialData.questions || []);
     }
-  }, [initialData, setValue]);
+  }, [initialData, mode]);
 
-  const steps = [
-    { title: 'Basic Information', icon: DocumentTextIcon },
-    { title: 'Questions', icon: QuestionMarkCircleIcon },
-    { title: 'Review', icon: AcademicCapIcon },
-  ];
+  // Validate form
+  const validateForm = () => {
+    const newErrors = {};
 
-  const handleAddQuestion = () => {
-    setQuestions([...questions, { text: '', options: ['', '', '', ''], correctOption: 0 }]);
-  };
-
-  const handleRemoveQuestion = (index) => {
-    setQuestions(questions.filter((_, i) => i !== index));
-  };
-
-  const handleQuestionChange = (index, field, value) => {
-    const newQuestions = [...questions];
-    if (field === 'text') {
-      newQuestions[index].text = value;
-    } else if (field.startsWith('option')) {
-      const optionIndex = parseInt(field.replace('option', ''));
-      newQuestions[index].options[optionIndex] = value;
-    } else if (field === 'correctOption') {
-      newQuestions[index].correctOption = parseInt(value);
+    if (!title.trim()) newErrors.title = "Title is required";
+    if (!category.trim()) newErrors.category = "Category is required";
+    if (!duration.trim() || isNaN(duration) || parseInt(duration) <= 0) {
+      newErrors.duration = "Duration must be a positive number";
     }
-    setQuestions(newQuestions);
+
+    // Validate questions
+    if (questions.length === 0) {
+      newErrors.questions = "At least one question is required";
+    } else {
+      questions.forEach((question, index) => {
+        if (!question.text.trim()) {
+          newErrors[`question_${index}`] = "Question text is required";
+        }
+
+        question.options.forEach((option, optIndex) => {
+          if (!option.trim()) {
+            newErrors[`question_${index}_option_${optIndex}`] =
+              "Option text is required";
+          }
+        });
+      });
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const onSubmit = async (data) => {
+  // Handle new question form
+  const handleOptionChange = (index, value) => {
+    const updatedOptions = [...newQuestion.options];
+    updatedOptions[index] = value;
+    setNewQuestion({ ...newQuestion, options: updatedOptions });
+  };
+
+  const handleCorrectOptionChange = (index) => {
+    setNewQuestion({ ...newQuestion, correctOption: index });
+  };
+
+  const addQuestion = () => {
+    // Validate question
+    if (!newQuestion.text.trim()) {
+      setErrors({ ...errors, newQuestion: "Question text is required" });
+      return;
+    }
+
+    const emptyOptions = newQuestion.options.some((option) => !option.trim());
+    if (emptyOptions) {
+      setErrors({
+        ...errors,
+        newQuestionOptions: "All options must be filled",
+      });
+      return;
+    }
+
+    // Add question and reset form
+    setQuestions([...questions, { ...newQuestion }]);
+    setNewQuestion({
+      text: "",
+      options: ["", "", "", ""],
+      correctOption: 0,
+    });
+    setErrors({ ...errors, newQuestion: null, newQuestionOptions: null });
+  };
+
+  // Edit existing question
+  const startEditingQuestion = (index) => {
+    setEditingQuestion(index);
+    setNewQuestion({ ...questions[index] });
+  };
+
+  const updateQuestion = () => {
+    // Validate
+    if (!newQuestion.text.trim()) {
+      setErrors({ ...errors, editQuestion: "Question text is required" });
+      return;
+    }
+
+    const emptyOptions = newQuestion.options.some((option) => !option.trim());
+    if (emptyOptions) {
+      setErrors({
+        ...errors,
+        editQuestionOptions: "All options must be filled",
+      });
+      return;
+    }
+
+    // Update question
+    const updatedQuestions = [...questions];
+    updatedQuestions[editingQuestion] = { ...newQuestion };
+    setQuestions(updatedQuestions);
+
+    // Reset
+    setEditingQuestion(null);
+    setNewQuestion({
+      text: "",
+      options: ["", "", "", ""],
+      correctOption: 0,
+    });
+    setErrors({ ...errors, editQuestion: null, editQuestionOptions: null });
+  };
+
+  const cancelEditingQuestion = () => {
+    setEditingQuestion(null);
+    setNewQuestion({
+      text: "",
+      options: ["", "", "", ""],
+      correctOption: 0,
+    });
+    setErrors({ ...errors, editQuestion: null, editQuestionOptions: null });
+  };
+
+  // Question list operations
+  const removeQuestion = (index) => {
+    const updatedQuestions = [...questions];
+    updatedQuestions.splice(index, 1);
+    setQuestions(updatedQuestions);
+  };
+
+  const moveQuestionUp = (index) => {
+    if (index === 0) return;
+    const updatedQuestions = [...questions];
+    [updatedQuestions[index - 1], updatedQuestions[index]] = [
+      updatedQuestions[index],
+      updatedQuestions[index - 1],
+    ];
+    setQuestions(updatedQuestions);
+  };
+
+  const moveQuestionDown = (index) => {
+    if (index === questions.length - 1) return;
+    const updatedQuestions = [...questions];
+    [updatedQuestions[index], updatedQuestions[index + 1]] = [
+      updatedQuestions[index + 1],
+      updatedQuestions[index],
+    ];
+    setQuestions(updatedQuestions);
+  };
+
+  // Form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      toast.error("Please fix the errors in the form");
+      return;
+    }
+
     setIsSubmitting(true);
+
     try {
-      // Here you would typically make an API call to save/update the quiz
-      const quizData = { ...data, questions };
-      console.log('Quiz Data:', quizData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Show success message
-      const message = mode === 'edit' ? 'Quiz updated successfully!' : 'Quiz created successfully!';
-      console.log(message);
-      
-      navigate('/admin/quizzes');
+      const quizData = {
+        title,
+        category,
+        difficulty,
+        duration: parseInt(duration),
+        status,
+        questions,
+      };
+
+      let response;
+
+      if (mode === "edit" && initialData) {
+        response = await QuizService.updateQuiz(initialData.id, quizData);
+        toast.success("Quiz updated successfully!");
+      } else {
+        response = await QuizService.createQuiz(quizData);
+        toast.success("Quiz created successfully!");
+      }
+
+      // Navigate back to quiz list
+      navigate("/admin/quizzes");
     } catch (error) {
-      console.error('Failed to save quiz:', error);
+      console.error("Failed to save quiz:", error);
+      toast.error(error.response?.data?.error || "Failed to save quiz");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="space-y-8">
-      {/* Progress Steps */}
-      <div className="relative">
-        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-700/50 transform -translate-y-1/2" />
-        <div className="relative flex justify-between max-w-2xl mx-auto">
-          {steps.map((step, index) => (
-            <motion.div
-              key={step.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="flex flex-col items-center relative z-10"
-            >
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  currentStep === index
-                    ? 'bg-sky-500 text-white'
-                    : currentStep > index
-                    ? 'bg-green-500 text-white'
-                    : 'bg-slate-800 text-slate-400'
-                } transition-all duration-200`}
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50"
+    >
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Quiz Details */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-400">
+              Title
+              <span className="text-sky-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className={`w-full px-4 py-2 bg-slate-900/50 border ${
+                errors.title ? "border-red-500" : "border-slate-700/50"
+              } rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200`}
+              placeholder="e.g. English Grammar Basics"
+            />
+            {errors.title && (
+              <p className="text-red-500 text-xs mt-1">{errors.title}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-400">
+              Category
+              <span className="text-sky-500">*</span>
+            </label>
+            <div className="relative">
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className={`w-full px-4 py-2 bg-slate-900/50 border ${
+                  errors.category ? "border-red-500" : "border-slate-700/50"
+                } rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200 appearance-none`}
               >
-                <step.icon className="w-5 h-5" />
+                <option value="">Select a category</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <svg
+                  className="w-5 h-5 text-slate-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M19 9l-7 7-7-7"
+                  ></path>
+                </svg>
               </div>
-              <span className="mt-2 text-sm font-medium text-slate-400">{step.title}</span>
-            </motion.div>
-          ))}
+            </div>
+            {errors.category && (
+              <p className="text-red-500 text-xs mt-1">{errors.category}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-400">
+              Difficulty
+              <span className="text-sky-500">*</span>
+            </label>
+            <div className="relative">
+              <select
+                value={difficulty}
+                onChange={(e) => setDifficulty(e.target.value)}
+                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200 appearance-none"
+              >
+                <option value="Beginner">Beginner</option>
+                <option value="Intermediate">Intermediate</option>
+                <option value="Advanced">Advanced</option>
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <svg
+                  className="w-5 h-5 text-slate-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M19 9l-7 7-7-7"
+                  ></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-400">
+              Duration (minutes)
+              <span className="text-sky-500">*</span>
+            </label>
+            <input
+              type="number"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              min="1"
+              className={`w-full px-4 py-2 bg-slate-900/50 border ${
+                errors.duration ? "border-red-500" : "border-slate-700/50"
+              } rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200`}
+              placeholder="e.g. 30"
+            />
+            {errors.duration && (
+              <p className="text-red-500 text-xs mt-1">{errors.duration}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-400">
+              Status
+            </label>
+            <div className="relative">
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200 appearance-none"
+              >
+                <option value="Draft">Draft</option>
+                <option value="Active">Active</option>
+                <option value="Archived">Archived</option>
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <svg
+                  className="w-5 h-5 text-slate-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M19 9l-7 7-7-7"
+                  ></path>
+                </svg>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Form */}
-      <motion.form
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-8"
-        onSubmit={handleSubmit(onSubmit)}
-      >
-        <AnimatePresence mode="wait">
-          {currentStep === 0 && (
-            <motion.div
-              key="step1"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50 space-y-6"
-            >
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Quiz Title
-                </label>
-                <input
-                  type="text"
-                  {...register('title', { required: 'Title is required' })}
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200"
-                  placeholder="Enter quiz title"
-                />
-                {errors.title && (
-                  <p className="mt-2 text-sm text-red-400">{errors.title.message}</p>
-                )}
-              </div>
+        {/* Questions Section */}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-white">
+              Questions
+              <span className="text-sky-500">*</span>
+            </h2>
+            <p className="text-sm text-slate-400">
+              {questions.length} question{questions.length !== 1 ? "s" : ""}{" "}
+              added
+            </p>
+          </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Category
-                </label>
-                <select
-                  {...register('category', { required: 'Category is required' })}
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200"
-                >
-                  <option value="">Select category</option>
-                  {categories.map(category => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </select>
-                {errors.category && (
-                  <p className="mt-2 text-sm text-red-400">{errors.category.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Difficulty
-                </label>
-                <select
-                  {...register('difficulty', { required: 'Difficulty is required' })}
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200"
-                >
-                  <option value="">Select difficulty</option>
-                  {difficulties.map(difficulty => (
-                    <option key={difficulty} value={difficulty}>{difficulty}</option>
-                  ))}
-                </select>
-                {errors.difficulty && (
-                  <p className="mt-2 text-sm text-red-400">{errors.difficulty.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Duration (minutes)
-                </label>
-                <input
-                  type="number"
-                  {...register('duration', { 
-                    required: 'Duration is required',
-                    min: { value: 1, message: 'Duration must be at least 1 minute' }
-                  })}
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200"
-                  placeholder="Enter duration in minutes"
-                />
-                {errors.duration && (
-                  <p className="mt-2 text-sm text-red-400">{errors.duration.message}</p>
-                )}
-              </div>
-            </motion.div>
+          {errors.questions && (
+            <p className="text-red-500 text-sm">{errors.questions}</p>
           )}
 
-          {currentStep === 1 && (
-            <motion.div
-              key="step2"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              {questions.map((question, questionIndex) => (
+          {/* Existing Questions List */}
+          <div className="space-y-4">
+            <AnimatePresence>
+              {questions.map((question, index) => (
                 <motion.div
-                  key={questionIndex}
-                  initial={{ opacity: 0, y: 20 }}
+                  key={index}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: questionIndex * 0.1 }}
-                  className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50 relative group"
+                  exit={{ opacity: 0, height: 0, overflow: "hidden" }}
+                  className="bg-slate-900/50 rounded-xl p-4 border border-slate-700/50"
                 >
-                  <div className="absolute -top-3 -left-3 bg-slate-900 rounded-lg px-3 py-1 text-sm text-slate-400">
-                    Question {questionIndex + 1}
-                  </div>
-                  
-                  {questions.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveQuestion(questionIndex)}
-                      className="absolute -top-3 -right-3 p-1.5 bg-red-500/10 text-red-400 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-500/20"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
-                  )}
+                  {editingQuestion === index ? (
+                    // Edit Question Form
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-slate-400">
+                          Question Text
+                        </label>
+                        <textarea
+                          value={newQuestion.text}
+                          onChange={(e) =>
+                            setNewQuestion({
+                              ...newQuestion,
+                              text: e.target.value,
+                            })
+                          }
+                          className={`w-full px-4 py-2 bg-slate-800/50 border ${
+                            errors.editQuestion
+                              ? "border-red-500"
+                              : "border-slate-700/50"
+                          } rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200`}
+                          placeholder="Enter question text"
+                          rows="2"
+                        ></textarea>
+                        {errors.editQuestion && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.editQuestion}
+                          </p>
+                        )}
+                      </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
-                        Question Text
-                      </label>
-                      <input
-                        type="text"
-                        value={question.text}
-                        onChange={(e) => handleQuestionChange(questionIndex, 'text', e.target.value)}
-                        className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200"
-                        placeholder="Enter question text"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {question.options.map((option, optionIndex) => (
-                        <div key={optionIndex}>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">
-                            Option {optionIndex + 1}
-                          </label>
-                          <div className="relative">
+                      <div className="space-y-3">
+                        <label className="block text-sm font-medium text-slate-400">
+                          Options
+                        </label>
+                        {newQuestion.options.map((option, optIndex) => (
+                          <div
+                            key={optIndex}
+                            className="flex items-start space-x-2"
+                          >
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleCorrectOptionChange(optIndex)
+                              }
+                              className={`flex-shrink-0 w-6 h-6 mt-2 rounded-full ${
+                                newQuestion.correctOption === optIndex
+                                  ? "bg-green-500 text-white"
+                                  : "bg-slate-700 text-slate-300"
+                              } flex items-center justify-center`}
+                            >
+                              {newQuestion.correctOption === optIndex && (
+                                <CheckIcon className="w-4 h-4" />
+                              )}
+                            </button>
                             <input
                               type="text"
                               value={option}
-                              onChange={(e) => handleQuestionChange(questionIndex, `option${optionIndex}`, e.target.value)}
-                              className={`w-full px-4 py-2 bg-slate-900/50 border rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200 ${
-                                question.correctOption === optionIndex
-                                  ? 'border-green-500/50'
-                                  : 'border-slate-700/50'
-                              }`}
-                              placeholder={`Enter option ${optionIndex + 1}`}
-                            />
-                            <input
-                              type="radio"
-                              name={`correct-${questionIndex}`}
-                              checked={question.correctOption === optionIndex}
-                              onChange={() => handleQuestionChange(questionIndex, 'correctOption', optionIndex)}
-                              className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-green-500 bg-slate-900 border-slate-700 focus:ring-green-500/50"
+                              onChange={(e) =>
+                                handleOptionChange(optIndex, e.target.value)
+                              }
+                              className={`flex-1 px-4 py-2 bg-slate-800/50 border ${
+                                errors.editQuestionOptions
+                                  ? "border-red-500"
+                                  : "border-slate-700/50"
+                              } rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200`}
+                              placeholder={`Option ${optIndex + 1}`}
                             />
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                        {errors.editQuestionOptions && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.editQuestionOptions}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex justify-end space-x-2">
+                        <button
+                          type="button"
+                          onClick={cancelEditingQuestion}
+                          className="px-3 py-1 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors flex items-center space-x-1"
+                        >
+                          <XMarkIcon className="w-4 h-4" />
+                          <span>Cancel</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={updateQuestion}
+                          className="px-3 py-1 bg-sky-600 text-white rounded-lg hover:bg-sky-500 transition-colors flex items-center space-x-1"
+                        >
+                          <CheckIcon className="w-4 h-4" />
+                          <span>Update</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    // Question Display
+                    <div>
+                      <div className="flex justify-between items-start">
+                        <h3 className="text-lg font-medium text-white mb-2">
+                          {index + 1}. {question.text}
+                        </h3>
+                        <div className="flex space-x-1">
+                          <button
+                            type="button"
+                            onClick={() => moveQuestionUp(index)}
+                            disabled={index === 0}
+                            className={`p-1 rounded ${
+                              index === 0
+                                ? "text-slate-600 cursor-not-allowed"
+                                : "text-slate-400 hover:text-white hover:bg-slate-700"
+                            } transition-colors`}
+                          >
+                            <ArrowUpIcon className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveQuestionDown(index)}
+                            disabled={index === questions.length - 1}
+                            className={`p-1 rounded ${
+                              index === questions.length - 1
+                                ? "text-slate-600 cursor-not-allowed"
+                                : "text-slate-400 hover:text-white hover:bg-slate-700"
+                            } transition-colors`}
+                          >
+                            <ArrowDownIcon className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => startEditingQuestion(index)}
+                            className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                          >
+                            <PencilIcon className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeQuestion(index)}
+                            className="p-1 rounded text-slate-400 hover:text-red-500 hover:bg-slate-700 transition-colors"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
+                        {question.options.map((option, optIndex) => (
+                          <div
+                            key={optIndex}
+                            className={`px-3 py-2 rounded ${
+                              question.correctOption === optIndex
+                                ? "bg-green-500/20 border border-green-500/50 text-green-400"
+                                : "bg-slate-800/50 border border-slate-700/50 text-slate-300"
+                            }`}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <span
+                                className={`flex-shrink-0 w-5 h-5 rounded-full ${
+                                  question.correctOption === optIndex
+                                    ? "bg-green-500 text-white"
+                                    : "bg-slate-700 text-slate-300"
+                                } flex items-center justify-center text-xs`}
+                              >
+                                {String.fromCharCode(65 + optIndex)}
+                              </span>
+                              <span>{option}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               ))}
+            </AnimatePresence>
+          </div>
 
-              <motion.button
-                type="button"
-                onClick={handleAddQuestion}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full py-3 rounded-xl border-2 border-dashed border-slate-700/50 text-slate-400 hover:text-sky-400 hover:border-sky-500/50 transition-all duration-200 flex items-center justify-center space-x-2"
-              >
-                <PlusIcon className="w-5 h-5" />
-                <span>Add Question</span>
-              </motion.button>
-            </motion.div>
-          )}
+          {/* Add New Question Form */}
+          <div className="bg-slate-900/50 rounded-xl p-5 border border-slate-700/50">
+            <h3 className="text-lg font-medium text-white mb-4">
+              Add New Question
+            </h3>
 
-          {currentStep === 2 && (
-            <motion.div
-              key="step3"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50 space-y-6"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-white">Quiz Details</h3>
-                  <div className="space-y-2">
-                    <p className="text-slate-400">Title: <span className="text-white">{watch('title')}</span></p>
-                    <p className="text-slate-400">Category: <span className="text-white">{watch('category')}</span></p>
-                    <p className="text-slate-400">Difficulty: <span className="text-white">{watch('difficulty')}</span></p>
-                    <p className="text-slate-400">Duration: <span className="text-white">{watch('duration')} minutes</span></p>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-white">Questions Overview</h3>
-                  <div className="space-y-2">
-                    <p className="text-slate-400">Total Questions: <span className="text-white">{questions.length}</span></p>
-                    <p className="text-slate-400">Options per Question: <span className="text-white">4</span></p>
-                  </div>
-                </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-400">
+                  Question Text
+                </label>
+                <textarea
+                  value={newQuestion.text}
+                  onChange={(e) =>
+                    setNewQuestion({ ...newQuestion, text: e.target.value })
+                  }
+                  className={`w-full px-4 py-2 bg-slate-800/50 border ${
+                    errors.newQuestion
+                      ? "border-red-500"
+                      : "border-slate-700/50"
+                  } rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200`}
+                  placeholder="Enter question text"
+                  rows="2"
+                ></textarea>
+                {errors.newQuestion && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.newQuestion}
+                  </p>
+                )}
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
-        {/* Navigation Buttons */}
-        <div className="flex justify-between">
-          <motion.button
-            type="button"
-            onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
-            disabled={currentStep === 0}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="px-6 py-2 bg-slate-800/50 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700/50 transition-all duration-200"
-          >
-            Previous
-          </motion.button>
-          
-          {currentStep < steps.length - 1 ? (
-            <motion.button
-              type="button"
-              onClick={() => setCurrentStep(Math.min(steps.length - 1, currentStep + 1))}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="px-6 py-2 bg-sky-500 text-white rounded-xl hover:bg-sky-600 transition-all duration-200"
-            >
-              Next
-            </motion.button>
-          ) : (
-            <motion.button
-              type="submit"
-              disabled={isSubmitting}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="px-6 py-2 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <span>{mode === 'edit' ? 'Updating Quiz...' : 'Creating Quiz...'}</span>
-                </>
-              ) : (
-                <span>{mode === 'edit' ? 'Update Quiz' : 'Create Quiz'}</span>
-              )}
-            </motion.button>
-          )}
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-slate-400">
+                  Options (select the correct one)
+                </label>
+                {newQuestion.options.map((option, index) => (
+                  <div key={index} className="flex items-start space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => handleCorrectOptionChange(index)}
+                      className={`flex-shrink-0 w-6 h-6 mt-2 rounded-full ${
+                        newQuestion.correctOption === index
+                          ? "bg-green-500 text-white"
+                          : "bg-slate-700 text-slate-300"
+                      } flex items-center justify-center`}
+                    >
+                      {newQuestion.correctOption === index && (
+                        <CheckIcon className="w-4 h-4" />
+                      )}
+                    </button>
+                    <input
+                      type="text"
+                      value={option}
+                      onChange={(e) =>
+                        handleOptionChange(index, e.target.value)
+                      }
+                      className={`flex-1 px-4 py-2 bg-slate-800/50 border ${
+                        errors.newQuestionOptions
+                          ? "border-red-500"
+                          : "border-slate-700/50"
+                      } rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-transparent transition-all duration-200`}
+                      placeholder={`Option ${index + 1}`}
+                    />
+                  </div>
+                ))}
+                {errors.newQuestionOptions && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.newQuestionOptions}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={addQuestion}
+                  className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-xl transition-colors flex items-center space-x-2"
+                >
+                  <PlusIcon className="w-5 h-5" />
+                  <span>Add Question</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </motion.form>
-    </div>
+
+        {/* Submit Buttons */}
+        <div className="flex justify-end space-x-4">
+          <button
+            type="button"
+            onClick={() => navigate("/admin/quizzes")}
+            className="px-6 py-2 bg-slate-700 text-white rounded-xl hover:bg-slate-600 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="px-6 py-2 bg-gradient-to-r from-sky-500 to-blue-600 rounded-xl text-white hover:shadow-lg hover:shadow-sky-500/25 transition-all duration-300 flex items-center space-x-2 disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? (
+              <>
+                <svg
+                  className="animate-spin h-5 w-5"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                {mode === "edit" ? (
+                  <>
+                    <DocumentCheckIcon className="w-5 h-5" />
+                    <span>Update Quiz</span>
+                  </>
+                ) : (
+                  <>
+                    <DocumentIcon className="w-5 h-5" />
+                    <span>Create Quiz</span>
+                  </>
+                )}
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </motion.div>
   );
 }
