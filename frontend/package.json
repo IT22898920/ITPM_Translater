@@ -25,6 +25,7 @@
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.50.0",
     "react-hot-toast": "^2.5.2",
+    "react-icons": "^5.5.0",
     "react-router-dom": "^6.22.0",
     "react-select": "^5.8.0",
     "wink-eng-lite-web-model": "^1.5.2",
