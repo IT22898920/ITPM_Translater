@@ -7,6 +7,8 @@ const cookieParser = require("cookie-parser");
 const errorHandler = require("./middlewares/errorMiddleware");
 const { initFirebaseAdmin } = require("./middlewares/firebaseAuthMiddleware");
 require("dotenv").config();
+const { protect, adminOnly } = require("./middlewares/authMiddleware"); // Import protect and adminOnly
+
 
 // Initialize Firebase Admin SDK
 initFirebaseAdmin();
@@ -36,6 +38,11 @@ app.use(cors(corsOptions));
 app.use(bodyParser.json());
 app.use(express.json());
 app.use(cookieParser());
+
+app.use("/api/posts", protect, postRoutes); // All post routes are protected
+
+app.use("/api/admin/posts", protect, adminOnly, postRoutes); // Admin-specific routes (only admins)
+
 
 // Route middleware
 app.use(postRoutes);
