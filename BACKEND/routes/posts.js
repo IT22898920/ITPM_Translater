@@ -1,16 +1,16 @@
 const express = require("express");
-const Posts = require("../models/posts"); // Import the Posts model
-const { protect, adminOnly } = require("../middlewares/authMiddleware"); // Import protect and adminOnly
+const Posts = require("../models/posts");
+const { protect, adminOnly } = require("../middlewares/authMiddleware");
 
 const router = express.Router();
 
-// Save post - Protected route
+// Save post
 router.post("/post/save", protect, (req, res) => {
   const { description, note } = req.body;
   let newPost = new Posts({
-    userId: req.user._id, // Use the authenticated user's ID
+    userId: req.user._id,
     description,
-    note
+    note,
   });
 
   newPost.save((err) => {
@@ -21,9 +21,9 @@ router.post("/post/save", protect, (req, res) => {
   });
 });
 
-// Get all posts by user ID - Protected route
+// Get all posts by user
 router.get("/posts/:userId", protect, (req, res) => {
-  const userId = req.user._id; // Get the user ID from the authenticated user
+  const userId = req.user._id;
 
   Posts.find({ userId: userId }).exec((err, posts) => {
     if (err) {
@@ -33,7 +33,7 @@ router.get("/posts/:userId", protect, (req, res) => {
   });
 });
 
-// Get all posts - Admin Only route
+// Get all posts - Admin
 router.get("/posts", protect, adminOnly, (req, res) => {
   Posts.find().exec((err, posts) => {
     if (err) {
@@ -43,9 +43,9 @@ router.get("/posts", protect, adminOnly, (req, res) => {
   });
 });
 
-// Update post - Protected route
+// Update post
 router.put("/post/update/:id", protect, (req, res) => {
-  Posts.findByIdAndUpdate(req.params.id, { $set: req.body }, (err, post) => {
+  Posts.findByIdAndUpdate(req.params.id, { $set: req.body }, (err) => {
     if (err) {
       return res.status(400).json({ error: err });
     }
@@ -53,7 +53,7 @@ router.put("/post/update/:id", protect, (req, res) => {
   });
 });
 
-// Delete post - Admin Only route
+// Delete post - Admin only
 router.delete("/post/delete/:id", protect, adminOnly, (req, res) => {
   Posts.findByIdAndRemove(req.params.id).exec((err, deletePost) => {
     if (err) return res.status(400).json({ message: "Delete Unsuccessful", err });

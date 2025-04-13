@@ -39,13 +39,11 @@ app.use(bodyParser.json());
 app.use(express.json());
 app.use(cookieParser());
 
-app.use("/api/posts", protect, postRoutes); // All post routes are protected
+// Mounting with protection
+app.use("/api/posts", protect, postRoutes);
+app.use("/api/admin/posts", protect, adminOnly, postRoutes);
 
-app.use("/api/admin/posts", protect, adminOnly, postRoutes); // Admin-specific routes (only admins)
 
-
-// Route middleware
-app.use(postRoutes);
 app.use("/api/auth", userRoutes);
 app.use("/synonyms", synonymsRouter);
 app.use("/antonyms", antonymsRouter);
