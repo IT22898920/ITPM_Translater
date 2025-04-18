@@ -34,7 +34,7 @@ router.get("/posts/:userId", protect, (req, res) => {
 });
 
 // Get all posts - Admin
-router.get("/posts", protect, adminOnly, (req, res) => {
+router.get("/posts", protect, (req, res) => {
   Posts.find().exec((err, posts) => {
     if (err) {
       return res.status(400).json({ error: err });
@@ -54,7 +54,7 @@ router.put("/post/update/:id", protect, (req, res) => {
 });
 
 // Delete post - Admin only
-router.delete("/post/delete/:id", protect, adminOnly, (req, res) => {
+router.delete("/post/delete/:id", protect,  (req, res) => {
   Posts.findByIdAndRemove(req.params.id).exec((err, deletePost) => {
     if (err) return res.status(400).json({ message: "Delete Unsuccessful", err });
     return res.json({ message: "Delete Successful", deletePost });
