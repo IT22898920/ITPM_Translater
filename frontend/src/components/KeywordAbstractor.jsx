@@ -1,3 +1,5 @@
+// Import required hooks and icons
+
 import { useState } from "react";
 import {
   ClipboardIcon,
@@ -7,10 +9,14 @@ import {
 import Select from "react-select";
 import { KeywordService } from "../services/apiService";
 
+// Supported languages for keyword extraction
+
 const languages = [
   { value: "en", label: "English" },
   { value: "si", label: "සිංහල (Sinhala)" },
 ];
+
+// Custom styles for react-select component
 
 const customSelectStyles = {
   control: (base) => ({
@@ -51,6 +57,7 @@ const customSelectStyles = {
 };
 
 export default function KeywordAbstractor() {
+    // State declarations
   const [text, setText] = useState("");
   const [keywords, setKeywords] = useState([]);
   const [copied, setCopied] = useState(false);
@@ -59,6 +66,7 @@ export default function KeywordAbstractor() {
   const [language, setLanguage] = useState({ value: "en", label: "English" });
   const [maxKeywords, setMaxKeywords] = useState(10); // Default max keywords limit
 
+    // Function to extract keywords from backend
   const extractKeywords = async () => {
     if (!text.trim()) {
       setError(
@@ -75,6 +83,8 @@ export default function KeywordAbstractor() {
     try {
       let extractedKeywords;
 
+      // Route API call based on selected language
+
       if (language.value === "si") {
         // Use the backend API for Sinhala keyword extraction
         extractedKeywords = await KeywordService.extractSinhalaKeywords(
@@ -89,8 +99,10 @@ export default function KeywordAbstractor() {
         );
       }
 
+            // Update state with extracted keywords
       setKeywords(extractedKeywords || []);
 
+            // Show message if no keywords found
       if (!extractedKeywords || extractedKeywords.length === 0) {
         setError(
           language.value === "si"
@@ -110,12 +122,14 @@ export default function KeywordAbstractor() {
     }
   };
 
+    // Reset all state values
   const handleReset = () => {
     setText("");
     setKeywords([]);
     setError("");
   };
 
+    // Copy extracted keywords to clipboard
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(keywords.join(", "));

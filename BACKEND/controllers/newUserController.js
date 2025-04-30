@@ -2,7 +2,7 @@ const asyncHandler = require("express-async-handler");
 const User = require("../models/newUserModel");
 const jwt = require("jsonwebtoken");
 
-// Generate JWT Token (for compatibility with existing systems)
+// Generate JWT Token (for compatibility with existing systems) j
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "1d" });
 };
@@ -17,7 +17,7 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new Error("Please provide all required fields");
   }
 
-  // Verify email from Firebase token matches request (only if we have firebaseEmail)
+  // Verify email from Firebase token matches request (only if we have firebaseEmail)j
   if (req.firebaseEmail && email !== req.firebaseEmail) {
     res.status(400);
     throw new Error("Email mismatch with authenticated user");
@@ -40,7 +40,7 @@ const registerUser = asyncHandler(async (req, res) => {
     photo: req.body.photoURL || "https://i.ibb.co/4pDNDk1/avatar.png",
   });
 
-  // Generate JWT Token for backward compatibility
+  // Generate JWT Token for backward compatibility j
   const token = generateToken(user._id);
 
   // Send HTTP-only cookie

@@ -9,11 +9,17 @@ import {
 } from '@heroicons/react/24/outline';
 
 const navigation = [
-  { name: 'Dashboard', href: '/admin', icon: HomeIcon },
-  { name: 'Quiz Management', href: '/admin/quizzes', icon: QuestionMarkCircleIcon },
-  { name: 'Users', href: '/admin/users', icon: UserGroupIcon },
-  { name: 'Analytics', href: '/admin/analytics', icon: ChartBarIcon },
-  { name: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon },
+  { name: "Dashboard", href: "/admin", icon: HomeIcon },
+  {
+    name: "Quiz Management",
+    href: "/admin/quizzes",
+    icon: QuestionMarkCircleIcon,
+  },
+  { name: "Users", href: "/admin/users", icon: UserGroupIcon },
+  { name: "Analytics", href: "/admin/analytics", icon: ChartBarIcon },
+  { name: "Settings", href: "/admin/settings", icon: Cog6ToothIcon },
+  { name: "Synonyms", href: "/admin/synonyms", icon: QuestionMarkCircleIcon },
+  { name: "Antonyms", href: "/admin/antonyms", icon: QuestionMarkCircleIcon },
 ];
 
 const sidebarVariants = {

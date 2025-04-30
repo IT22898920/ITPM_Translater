@@ -29,6 +29,11 @@ import { useState } from "react";
 import { useAdminStore } from "./stores/adminStore";
 import { QuizProvider } from "./contexts/QuizContext.jsx"; // Make sure to import with .jsx extension
 import { Toaster } from "react-hot-toast";
+import Synonyms from "./components/synonyms";
+import Antonyms from "./components/antonyms";
+import AdminAntonyms from "./components/admin/AdminAntonyms.jsx";
+import AdminSynonyms from "./components/admin/AdminSynonyms";
+import Footer from "./components/Footer"; // Import the new Footer component
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -135,6 +140,22 @@ function AnimatedRoutes() {
               </PageTransition>
             }
           />
+          <Route
+            path="/synonyms"
+            element={
+              <PageTransition>
+                <Synonyms />
+              </PageTransition>
+            }
+          />
+          <Route
+            path="/antonyms"
+            element={
+              <PageTransition>
+                <Antonyms />
+              </PageTransition>
+            }
+          />
 
           {/* Admin Routes - Wrapped with QuizProvider */}
           <Route
@@ -163,6 +184,10 @@ function AnimatedRoutes() {
               path="settings"
               element={<div className="text-white">Settings</div>}
             />
+
+            {/* Admin Synonyms and Antonyms */}
+            <Route path="synonyms" element={<AdminSynonyms />} />
+            <Route path="antonyms" element={<AdminAntonyms />} />
           </Route>
         </Routes>
       </AnimatePresence>
@@ -172,121 +197,13 @@ function AnimatedRoutes() {
         onClose={() => setShowLoginModal(false)}
       />
 
-      <footer className="mt-32 text-center text-slate-400 border-t border-slate-800 pt-8">
-        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-          <div>
-            <h3 className="font-semibold text-slate-200 mb-2">Tools</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link
-                  to="/text-to-speech"
-                  className="text-slate-400 hover:text-sky-400 transition-colors"
-                >
-                  Text to Speech
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/speech-to-text"
-                  className="text-slate-400 hover:text-sky-400 transition-colors"
-                >
-                  Speech to Text
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/keyword-abstractor"
-                  className="text-slate-400 hover:text-sky-400 transition-colors"
-                >
-                  Keyword Abstractor
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/english-quiz"
-                  className="text-slate-400 hover:text-sky-400 transition-colors"
-                >
-                  English Quiz
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/"
-                  className="text-slate-400 hover:text-sky-400 transition-colors"
-                >
-                  Translator
-                </Link>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-semibold text-slate-200 mb-2">Resources</h3>
-            <ul className="space-y-2">
-              <li>
-                <a
-                  href="#"
-                  className="text-slate-400 hover:text-sky-400 transition-colors"
-                >
-                  Documentation
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-slate-400 hover:text-sky-400 transition-colors"
-                >
-                  API
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-slate-400 hover:text-sky-400 transition-colors"
-                >
-                  Pricing
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div className="admin-section">
-            <h3 className="font-semibold text-slate-200 mb-2">Admin</h3>
-            <ul className="space-y-2">
-              {!isAuthenticated ? (
-                <li>
-                  <button
-                    onClick={() => setShowLoginModal(true)}
-                    className="text-slate-400 hover:text-sky-400 transition-colors"
-                  >
-                    Admin Login
-                  </button>
-                </li>
-              ) : (
-                <>
-                  <li>
-                    <Link
-                      to="/admin"
-                      className="text-slate-400 hover:text-sky-400 transition-colors"
-                    >
-                      Admin Dashboard
-                    </Link>
-                  </li>
-                  <li>
-                    <button
-                      onClick={handleAdminLogout}
-                      className="text-slate-400 hover:text-sky-400 transition-colors"
-                    >
-                      Logout ({admin?.name || "Admin"})
-                    </button>
-                  </li>
-                </>
-              )}
-            </ul>
-          </div>
-        </div>
-        <p className="text-sm border-t border-slate-800 pt-8 pb-4">
-          © 2025 TranslaterHUB. All rights reserved.
-        </p>
-      </footer>
+      {/* Using the new enhanced Footer component */}
+      <Footer
+        isAuthenticated={isAuthenticated}
+        admin={admin}
+        handleAdminLogout={handleAdminLogout}
+        setShowLoginModal={setShowLoginModal}
+      />
 
       {/* Toast Notifications */}
       <Toaster

@@ -21,6 +21,8 @@ const navItems = [
   { path: "/speech-to-text", label: "Speech to Text", icon: MicrophoneIcon },
   { path: "/keyword-abstractor", label: "Keyword Abstractor", icon: KeyIcon },
   { path: "/english-quiz", label: "English Quiz", icon: AcademicCapIcon },
+  { path: "/antonyms", label: "Antonyms", icon: SparklesIcon },
+  { path: "/synonyms", label: "Synonyms", icon: SparklesIcon },
 ];
 
 export default function Header() {
