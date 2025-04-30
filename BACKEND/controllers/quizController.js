@@ -71,7 +71,7 @@ const getQuizById = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Quiz not found");
   }
-
+  // Always
   // Format the response to match frontend expectations
   const formattedQuiz = {
     id: quiz._id,
@@ -130,7 +130,7 @@ const createQuiz = asyncHandler(async (req, res) => {
     throw new Error("Invalid quiz data");
   }
 });
-
+  // Always
 /**
  * @desc    Update a quiz
  * @route   PUT /api/quizzes/:id
@@ -156,7 +156,7 @@ const updateQuiz = asyncHandler(async (req, res) => {
   quiz.difficulty = difficulty || quiz.difficulty;
   quiz.duration = duration ? parseInt(duration) : quiz.duration;
   quiz.status = status || quiz.status;
-
+  // Always
   // Only update questions if provided
   if (questions) {
     quiz.questions = questions;
@@ -197,7 +197,7 @@ const deleteQuiz = asyncHandler(async (req, res) => {
     .status(200)
     .json({ id: req.params.id, message: "Quiz deleted successfully" });
 });
-
+  // Always
 /**
  * @desc    Get quiz categories
  * @route   GET /api/quizzes/categories
@@ -208,7 +208,7 @@ const getQuizCategories = asyncHandler(async (req, res) => {
   const categories = await Quiz.distinct("category", {
     createdBy: req.user._id,
   });
-
+  // Always
   // Always include "All" as the first option to match frontend
   res.status(200).json(["All", ...categories]);
 });
