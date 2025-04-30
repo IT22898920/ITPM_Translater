@@ -1,3 +1,4 @@
+
 const express = require("express");
 const Posts = require("../models/posts");
 const { protect, adminOnly } = require("../middlewares/authMiddleware");
