@@ -1,3 +1,5 @@
+#import libraries
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import nltk
@@ -90,6 +92,7 @@ for resource in nltk_resources:
     except Exception as e:
         logger.error(f"Error downloading NLTK resource {resource}: {str(e)}")
 
+# Install googletrans if not already installed
 def install_googletrans():
     """Install googletrans package if not available."""
     try:
@@ -120,6 +123,8 @@ app = Flask(__name__)
 CORS(app)
 CORS(app, resources={r"/*": {"origins": "*"}})  # For development
 
+
+# Translate any text into English
 def translator(t):
     """Translate any given text (string) into English using Google Translate."""
     try:
@@ -147,6 +152,7 @@ def translator(t):
         # Return original text if translation fails
         return t
 
+# Translate English words into Sinhala
 def sinhalTranslator(words):
     """Translate a list of English words into Sinhala."""
     try:
@@ -168,6 +174,7 @@ def sinhalTranslator(words):
         logger.error(f"Sinhala translation error: {str(e)}")
         return words  # Return original words if translation fails
 
+# Extract English keywords (nouns) from a given text
 def keywordsExtractorEnglish(text, max_keywords=None):
     """
     Extract English nouns from the input text.
@@ -244,6 +251,8 @@ def keywordsExtractorEnglish(text, max_keywords=None):
         except:
             return []
 
+# Extract Sinhala keywords by translating Sinhala → English → Extract Nouns → Translate Nouns → Sinhala
+
 def keywordExtractorFromSinhala(text, max_keywords=None):
     """
     1. Translate Sinhala text to English
@@ -275,6 +284,8 @@ def keywordExtractorFromSinhala(text, max_keywords=None):
         logger.error(f"Error in Sinhala keyword extraction: {str(e)}")
         return []
 
+# API endpoint for Sinhala keyword extraction
+
 @app.route('/extract_keywords_sinhala', methods=['POST'])
 def extract_keywords_sinhala():
     """
@@ -303,6 +314,8 @@ def extract_keywords_sinhala():
         except Exception as e:
             logger.error(f"Error processing request: {str(e)}")
             return jsonify({'error': str(e)}), 500
+
+# API endpoint for English keyword extraction
 
 @app.route('/extract_keywords', methods=['POST'])
 def extract_keywords_english():
@@ -333,6 +346,8 @@ def extract_keywords_english():
             logger.error(f"Error processing request: {str(e)}")
             return jsonify({'error': str(e)}), 500
 
+# Home endpoint for health check and API info
+
 @app.route('/', methods=['GET'])
 def home():
     """Simple home endpoint to verify the API is running."""
@@ -343,6 +358,8 @@ def home():
             '/extract_keywords_sinhala': 'Extract keywords from Sinhala text (POST with {"text": "...", "max_keywords": optional_number})'
         }
     })
+
+# Run the Flask app
 
 if __name__ == '__main__':
     # Set up required resources
