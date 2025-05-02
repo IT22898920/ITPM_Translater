@@ -11,6 +11,8 @@ import {
   AcademicCapIcon,
   SparklesIcon,
   UserIcon,
+  PencilSquareIcon, // Icon for Add Post
+  DocumentTextIcon, // Icon for My Posts
 } from "@heroicons/react/24/outline";
 import AuthModal from "./auth/AuthModal";
 import { useUserStore } from "../stores/userStore";
@@ -23,6 +25,8 @@ const navItems = [
   { path: "/english-quiz", label: "English Quiz", icon: AcademicCapIcon },
   { path: "/antonyms", label: "Antonyms", icon: SparklesIcon },
   { path: "/synonyms", label: "Synonyms", icon: SparklesIcon },
+  { path: "/add-post", label: "Add Post", icon: PencilSquareIcon, requiresAuth: true },
+  { path: "/my-posts", label: "My Posts", icon: DocumentTextIcon, requiresAuth: true },
 ];
 
 export default function Header() {
@@ -63,6 +67,15 @@ export default function Header() {
       console.error("Header: Logout error", error);
     }
   };
+
+  // Filter navigation items based on authentication
+  const filteredNavItems = navItems.filter(item => {
+    // Only show auth-required items when authenticated
+    if (item.requiresAuth && !isAuthenticated) {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <>
@@ -123,7 +136,7 @@ export default function Header() {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-1">
-              {navItems.map((item) => (
+              {filteredNavItems.map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}
@@ -151,6 +164,14 @@ export default function Header() {
                     <span>{user.name || user.email}</span>
                   </button>
                   <div className="absolute right-0 mt-2 w-48 py-2 bg-slate-800 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                    {user.role === "admin" && (
+                      <Link
+                        to="/admin"
+                        className="block w-full px-4 py-2 text-left text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors"
+                      >
+                        Admin Dashboard
+                      </Link>
+                    )}
                     <button
                       onClick={handleLogout}
                       className="w-full px-4 py-2 text-left text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors"
@@ -228,7 +249,7 @@ export default function Header() {
                 className="md:hidden mt-4"
               >
                 <motion.nav className="grid gap-2 p-4 bg-slate-800/50 backdrop-blur-lg rounded-2xl border border-slate-700/50">
-                  {navItems.map((item) => (
+                  {filteredNavItems.map((item) => (
                     <MobileNavLink
                       key={item.path}
                       to={item.path}
@@ -254,6 +275,15 @@ export default function Header() {
                         )}
                         <span>{user.name || user.email}</span>
                       </div>
+                      {user.role === "admin" && (
+                        <Link
+                          to="/admin"
+                          onClick={() => setMenuOpen(false)}
+                          className="w-full px-4 py-3 text-left text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-xl transition-colors"
+                        >
+                          Admin Dashboard
+                        </Link>
+                      )}
                       <button
                         onClick={handleLogout}
                         className="w-full px-4 py-3 text-left text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-xl transition-colors"
