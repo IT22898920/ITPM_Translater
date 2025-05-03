@@ -34,6 +34,9 @@ import Antonyms from "./components/antonyms";
 import AdminAntonyms from "./components/admin/AdminAntonyms.jsx";
 import AdminSynonyms from "./components/admin/AdminSynonyms";
 import Footer from "./components/Footer"; // Import the new Footer component
+import AddPostPage from "./components/posts/AddPostPage.jsx";
+import MyPostsPage from "./components/posts/MyPostsPage.jsx";
+import EditPostPage from "./components/posts/EditPostPage.jsx";
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -148,6 +151,25 @@ function AnimatedRoutes() {
               </PageTransition>
             }
           />
+           <Route
+            path="/add-post"
+            element={<AddPostPage />}
+              />
+           <Route
+            path="/my-posts"
+            element={<PageTransition>
+                <MyPostsPage />
+            </PageTransition>
+           }
+           />
+      <Route
+       path="/edit-post/:id"
+       element={
+     <PageTransition>
+      <EditPostPage />
+     </PageTransition>
+  }
+/>
           <Route
             path="/antonyms"
             element={
